@@ -5,6 +5,7 @@ fn main() {
     println!("Hello, please enter your weekly work hours.");
 
     let workh = user_input_work_hours(&mut input);
+    clear_terminal();
 
     println!("Your weekly work hours are {}", workh);
     println!("Please enter your hours, seperated by whitespaces.");
@@ -18,6 +19,7 @@ fn main() {
                 break;
             }
             Some(e) => {
+                clear_terminal();
                 println!("{}", e);
                 println!("Please enter your daily hours, seperated by whitespaces.");
                 continue;
@@ -27,6 +29,7 @@ fn main() {
 
     let result = workh - hours;
     let result_time = result_as_date(result);
+    clear_terminal();
 
     println!(
         "you still need to work {:.2} hours or {}h",
@@ -36,6 +39,10 @@ fn main() {
 
     // so the console doesnt close
     stdin().read_line(&mut String::new()).unwrap();
+}
+
+fn clear_terminal() {
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
 }
 
 fn result_as_date(result: f64) -> String {
@@ -77,22 +84,24 @@ fn user_input_hours(mut input: &mut String) -> (f64, Option<String>) {
 }
 
 fn input_to_vec(input: &mut &mut String) -> Vec<f64> {
-    if input.contains(":") {
-        input
-            .split_whitespace()
-            .map(|x| {
+    let input_vec = input
+        .split_whitespace()
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>();
+    let mut output_vec = Vec::new();
+    for x in input_vec {
+        if x.contains(":") {
+            output_vec.push(
                 x.trim()
                     .split_once(':')
                     .map(|x| x.0.parse::<f64>().unwrap() + (x.1.parse::<f64>().unwrap() / 60.0))
-                    .unwrap_or(0.0)
-            })
-            .collect::<Vec<f64>>()
-    } else {
-        input
-            .split_whitespace()
-            .map(|x| x.trim().replace(",", ".").parse::<f64>().unwrap_or(0.0))
-            .collect::<Vec<f64>>()
+                    .unwrap_or(0.0),
+            )
+        } else {
+            output_vec.push(x.replace(",", ".").parse::<f64>().unwrap());
+        }
     }
+    output_vec
 }
 
 fn user_input_work_hours(input: &mut String) -> f64 {
