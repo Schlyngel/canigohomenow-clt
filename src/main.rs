@@ -1,13 +1,35 @@
+use std::fs;
 use std::io::stdin;
 
 fn main() {
     let mut input = String::new();
-    println!("Hello, please enter your weekly work hours.");
+    let mut workh: f64;
+    if load_workh().is_normal() {
+        workh = load_workh();
+        println!("Hello, your weekly work hours are {}", workh);
+        println!("Change weekly work hours? [y/N]");
+        stdin().read_line(&mut input).unwrap();
+        if input.trim().to_lowercase() == "y" {
+            clear_terminal();
+            println!("Please enter your weekly work hours.");
+            input.clear();
+            workh = user_input_work_hours(&mut input);
+            save_workh(workh);
+        }
+    } else {
+        println!("Hello, please enter your weekly work hours.");
+        workh = user_input_work_hours(&mut input);
+        clear_terminal();
+        println!("Your weekly work hours are {}", workh);
+        println!("Do you want to save your work hours for the future? [Y/n]");
+        stdin().read_line(&mut input).unwrap();
+        if input.trim().to_lowercase() != "n" {
+            save_workh(workh);
+        }
+        input.clear();
+    }
 
-    let workh = user_input_work_hours(&mut input);
     clear_terminal();
-
-    println!("Your weekly work hours are {}", workh);
     println!("Please enter your hours, seperated by whitespaces.");
 
     let hours: f64;
@@ -39,6 +61,17 @@ fn main() {
 
     // so the console doesnt close
     stdin().read_line(&mut String::new()).unwrap();
+}
+
+fn load_workh() -> f64 {
+    fs::read_to_string("cighn_savefile")
+        .unwrap_or("0".to_string())
+        .parse::<f64>()
+        .unwrap()
+}
+
+fn save_workh(workh: f64) {
+    fs::write("cighn_savefile", workh.to_string()).expect("Unable to write file");
 }
 
 fn clear_terminal() {
@@ -94,7 +127,9 @@ fn input_to_vec(input: &mut &mut String) -> Vec<f64> {
             output_vec.push(
                 x.trim()
                     .split_once(':')
-                    .map(|x| x.0.parse::<f64>().unwrap() + (x.1.parse::<f64>().unwrap() / 60.0))
+                    .map(
+                        |x| x.0.parse::<f64>().unwrap() + (x.1.parse::<f64>().unwrap() / 60.0)
+                    )
                     .unwrap_or(0.0),
             )
         } else {
