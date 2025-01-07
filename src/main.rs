@@ -57,10 +57,25 @@ fn main() {
         "you still need to work {:.2} hours or {}h",
         result, result_time
     );
+    println!("Please enter you start time.");
+    let end_time = calc_end_time(&mut input, result);
+    clear_terminal();
+    println!("You can go home at {}", end_time);
+
     println!("press any key to quit...");
 
     // so the console doesnt close
     stdin().read_line(&mut String::new()).unwrap();
+}
+
+fn calc_end_time(mut input: &mut String, hours: f64) -> String {
+    match stdin().read_line(&mut input) {
+        Ok(_) => {}
+        Err(error) => println!("Error: {}", error),
+    }
+    let result = result_as_date(input_to_vec(&mut input).iter().sum::<f64>() + hours);
+    input.clear();
+    result
 }
 
 fn load_workh() -> f64 {
