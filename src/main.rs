@@ -1,11 +1,25 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::stdin;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Save {
+    workh: f64,
+    pause: Vec<f64>,
+}
+
+impl Save {
+    fn new(workh: f64, pause: Vec<f64>) -> Self {
+        Save { workh, pause }
+    }
+}
 
 fn main() {
     let mut input = String::new();
     let mut workh: f64;
-    if load_workh().is_normal() {
-        workh = load_workh();
+    let mut pause: Vec<f64> = vec![];
+    if load_data().is_some() {
+        Save { workh, pause } = load_data().unwrap();
         println!("Hello, your weekly work hours are {}", workh);
         println!("Change weekly work hours? [y/N]");
         stdin().read_line(&mut input).unwrap();
@@ -14,7 +28,7 @@ fn main() {
             println!("Please enter your weekly work hours.");
             input.clear();
             workh = user_input_work_hours(&mut input);
-            save_workh(workh);
+            save_data(Save::new(workh, vec![]));
         }
     } else {
         println!("Hello, please enter your weekly work hours.");
@@ -24,7 +38,7 @@ fn main() {
         println!("Do you want to save your work hours for the future? [Y/n]");
         stdin().read_line(&mut input).unwrap();
         if input.trim().to_lowercase() != "n" {
-            save_workh(workh);
+            save_data(Save::new(workh, vec![]));
         }
         input.clear();
     }
@@ -58,9 +72,42 @@ fn main() {
         result, result_time
     );
     println!("Please enter you start time.");
-    let end_time = calc_end_time(&mut input, result);
+    let start_time = get_start_time(&mut input);
     clear_terminal();
-    println!("You can go home at {}", end_time);
+    if !pause.is_empty() {
+        println!(
+            "Your breaktime is {}h for <6h, {}h for 6-9h and {}h for >9h.",
+            pause[0], pause[1], pause[2]
+        );
+        println!("Do you want to change your breaktime? [y/N]");
+        stdin().read_line(&mut input).unwrap();
+        if input.trim().to_lowercase() == "y" {
+            input.clear();
+            clear_terminal();
+            println!("Please enter your breaktime for <6h, 6-9h and >9h.");
+            pause = get_pause_time(&mut input);
+            save_data(Save::new(workh, pause.clone()));
+        }
+    } else {
+        println!("Please enter your breaktime for <6h, 6-9h and >9h.");
+        pause = get_pause_time(&mut input);
+        clear_terminal();
+        println!(
+            "Your breaktime is {}h for <6h, {}h for 6-9h and {}h for >9h.",
+            pause[0], pause[1], pause[2]
+        );
+        println!("Do you want to save your breaktime for the future? [Y/n].");
+        stdin().read_line(&mut input).unwrap();
+        if input.trim().to_lowercase() != "y" {
+            save_data(Save::new(workh, pause.clone()));
+        }
+        input.clear();
+    }
+    clear_terminal();
+    println!(
+        "You can go home at {}",
+        calc_end_time(start_time, pause, result)
+    );
 
     println!("press any key to quit...");
 
@@ -68,41 +115,68 @@ fn main() {
     stdin().read_line(&mut String::new()).unwrap();
 }
 
-fn calc_end_time(mut input: &mut String, hours: f64) -> String {
-    match stdin().read_line(&mut input) {
+fn get_pause_time(input: &mut String) -> Vec<f64> {
+    match stdin().read_line(input) {
         Ok(_) => {}
         Err(error) => println!("Error: {}", error),
     }
-    let result = result_as_date(input_to_vec(&mut input).iter().sum::<f64>() + hours);
+    let result: Vec<f64> = input_to_vec(input)
+        .iter()
+        .map(|x| if x > &5.0 { x / 60.0 } else { *x })
+        .collect();
     input.clear();
     result
 }
 
-fn load_workh() -> f64 {
-    fs::read_to_string("cighn_savefile")
-        .unwrap_or("0".to_string())
-        .parse::<f64>()
-        .unwrap()
+fn get_start_time(input: &mut String) -> f64 {
+    match stdin().read_line(input) {
+        Ok(_) => {}
+        Err(error) => println!("Error: {}", error),
+    }
+    let result: f64 = input_to_vec(input).iter().sum::<f64>();
+    input.clear();
+    result
 }
 
-fn save_workh(workh: f64) {
-    fs::write("cighn_savefile", workh.to_string()).expect("Unable to write file");
+fn calc_end_time(start_time: f64, pause: Vec<f64>, remaining: f64) -> String {
+    if remaining.lt(&6.0) {
+        result_as_date(start_time + pause[0] + remaining)
+    } else if remaining.gt(&9.0) {
+        result_as_date(start_time + pause[2] + remaining)
+    } else {
+        result_as_date(start_time + pause[1] + remaining)
+    }
+}
+
+fn load_data() -> Option<Save> {
+    let buffer = fs::read_to_string("cighn_savefile").unwrap_or("".to_string());
+    if !buffer.is_empty() {
+        Some(serde_json::from_str(&buffer).unwrap())
+    } else {
+        None
+    }
+}
+
+fn save_data(save: Save) {
+    fs::write("cighn_savefile", serde_json::to_string(&save).unwrap())
+        .expect("Unable to write file");
 }
 
 fn clear_terminal() {
     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
 }
 
+#[allow(clippy::obfuscated_if_else)]
 fn result_as_date(result: f64) -> String {
     let mut result_time = String::new();
     result_time.push_str(result.floor().to_string().as_str());
-    result_time.push_str(":");
+    result_time.push(':');
     result_time.push_str(
         ((result - result.floor()) * 60.0)
             .floor()
             .to_string()
             .eq("0")
-            .then(|| "00")
+            .then_some("00")
             .unwrap_or(
                 ((result - result.floor()) * 60.0)
                     .floor()
@@ -113,12 +187,12 @@ fn result_as_date(result: f64) -> String {
     result_time
 }
 
-fn user_input_hours(mut input: &mut String) -> (f64, Option<String>) {
-    match stdin().read_line(&mut input) {
+fn user_input_hours(input: &mut String) -> (f64, Option<String>) {
+    match stdin().read_line(input) {
         Ok(_) => {}
         Err(error) => println!("Error: {}", error),
     }
-    let input_vec = input_to_vec(&mut input);
+    let input_vec = input_to_vec(input);
     let mut hours_err = None;
     for x in input_vec.iter() {
         if x > &24.0 {
@@ -131,7 +205,7 @@ fn user_input_hours(mut input: &mut String) -> (f64, Option<String>) {
     (hours, hours_err)
 }
 
-fn input_to_vec(input: &mut &mut String) -> Vec<f64> {
+fn input_to_vec(input: &mut str) -> Vec<f64> {
     let input_vec = input
         .split_whitespace()
         .map(|x| x.trim())
@@ -142,9 +216,7 @@ fn input_to_vec(input: &mut &mut String) -> Vec<f64> {
             output_vec.push(
                 x.trim()
                     .split_once(':')
-                    .map(
-                        |x| x.0.parse::<f64>().unwrap() + (x.1.parse::<f64>().unwrap() / 60.0)
-                    )
+                    .map(|x| x.0.parse::<f64>().unwrap() + (x.1.parse::<f64>().unwrap() / 60.0))
                     .unwrap_or(0.0),
             )
         } else {
