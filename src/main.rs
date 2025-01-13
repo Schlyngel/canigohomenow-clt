@@ -24,7 +24,7 @@ fn main() {
         println!("Change weekly work hours? [y/N]");
         stdin().read_line(&mut input).unwrap();
         if input.trim().to_lowercase() == "y" {
-            clear_terminal();
+            clearscreen::clear().expect("Failed to clear screen");
             println!("Please enter your weekly work hours.");
             input.clear();
             workh = user_input_work_hours(&mut input);
@@ -33,17 +33,17 @@ fn main() {
     } else {
         println!("Hello, please enter your weekly work hours.");
         workh = user_input_work_hours(&mut input);
-        clear_terminal();
+        clearscreen::clear().expect("Failed to clear screen");
         println!("Your weekly work hours are {}", workh);
         println!("Do you want to save your work hours for the future? [Y/n]");
         stdin().read_line(&mut input).unwrap();
         if input.trim().to_lowercase() != "n" {
             save_data(Save::new(workh, vec![]));
         }
-        input.clear();
     }
 
-    clear_terminal();
+    input.clear();
+    clearscreen::clear().expect("Failed to clear screen");
     println!("Please enter your hours, seperated by whitespaces.");
 
     let hours: f64;
@@ -55,7 +55,7 @@ fn main() {
                 break;
             }
             Some(e) => {
-                clear_terminal();
+                clearscreen::clear().expect("Failed to clear screen");
                 println!("{}", e);
                 println!("Please enter your daily hours, seperated by whitespaces.");
                 continue;
@@ -65,7 +65,7 @@ fn main() {
 
     let result = workh - hours;
     let result_time = result_as_date(result);
-    clear_terminal();
+    clearscreen::clear().expect("Failed to clear screen");
 
     println!(
         "you still need to work {:.2} hours or {}h",
@@ -73,7 +73,7 @@ fn main() {
     );
     println!("Please enter you start time.");
     let start_time = get_start_time(&mut input);
-    clear_terminal();
+    clearscreen::clear().expect("Failed to clear screen");
     if !pause.is_empty() {
         println!(
             "Your breaktime is {}h for <6h, {}h for 6-9h and {}h for >9h.",
@@ -83,7 +83,7 @@ fn main() {
         stdin().read_line(&mut input).unwrap();
         if input.trim().to_lowercase() == "y" {
             input.clear();
-            clear_terminal();
+            clearscreen::clear().expect("Failed to clear screen");
             println!("Please enter your breaktime for <6h, 6-9h and >9h.");
             pause = get_pause_time(&mut input);
             save_data(Save::new(workh, pause.clone()));
@@ -91,7 +91,7 @@ fn main() {
     } else {
         println!("Please enter your breaktime for <6h, 6-9h and >9h.");
         pause = get_pause_time(&mut input);
-        clear_terminal();
+        clearscreen::clear().expect("Failed to clear screen");
         println!(
             "Your breaktime is {}h for <6h, {}h for 6-9h and {}h for >9h.",
             pause[0], pause[1], pause[2]
@@ -103,7 +103,7 @@ fn main() {
         }
         input.clear();
     }
-    clear_terminal();
+    clearscreen::clear().expect("Failed to clear screen");
     println!(
         "You can go home at {}",
         calc_end_time(start_time, pause, result)
@@ -162,27 +162,18 @@ fn save_data(save: Save) {
         .expect("Unable to write file");
 }
 
-fn clear_terminal() {
-    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-}
-
 #[allow(clippy::obfuscated_if_else)]
 fn result_as_date(result: f64) -> String {
+    let minutes = ((result - result.floor()) * 60.0).floor();
     let mut result_time = String::new();
     result_time.push_str(result.floor().to_string().as_str());
     result_time.push(':');
     result_time.push_str(
-        ((result - result.floor()) * 60.0)
-            .floor()
-            .to_string()
-            .eq("0")
-            .then_some("00")
-            .unwrap_or(
-                ((result - result.floor()) * 60.0)
-                    .floor()
-                    .to_string()
-                    .as_str(),
-            ),
+        minutes
+            .lt(&10.0)
+            .then_some("0".to_owned() + minutes.to_string().as_str())
+            .unwrap_or(minutes.to_string())
+            .as_str(),
     );
     result_time
 }
